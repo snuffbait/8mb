@@ -1,0 +1,43 @@
+<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>compressor</title><style>*,::after,::before{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0d0d0d;--surface:#141414;--border:#222;--border-active:#3a3a3a;--text:#d4d4d4;--muted:#555;--accent:#e8e8e8;--font:'JetBrains Mono',monospace}body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}.wrap{max-width:780px;width:100%}textarea{background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--font);font-size:12px;padding:12px;width:100%;min-height:260px;outline:0;line-height:1.6;cursor:pointer;resize:none;text-align:center;padding-top:120px}textarea:hover{border-color:var(--border-active)}</style>
+<div class=wrap>
+  <input type=file id=fileInput accept="video/*" style=display:none>
+  <textarea id=box readonly onclick="document.getElementById('fileInput').click()">click to upload video</textarea>
+</div>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
+<script>
+const box = document.getElementById('box');
+const fileInput = document.getElementById('fileInput');
+let ffmpeg = null;
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').then(() => { if (!navigator.serviceWorker.controller) location.reload(); });
+
+fileInput.addEventListener('change', () => { if (fileInput.files[0]) run(fileInput.files[0]); });
+
+async function run(file) {
+  box.value = 'loading ffmpeg...';
+  const { createFFmpeg, fetchFile } = FFmpeg;
+  if (!ffmpeg) {
+    ffmpeg = createFFmpeg({ log: false });
+    await ffmpeg.load();
+  }
+  box.value = 'compressing...';
+  const duration = await new Promise(res => {
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { URL.revokeObjectURL(v.src); res(v.duration); };
+    v.src = URL.createObjectURL(file);
+  });
+  const videoBitrate = Math.max(Math.floor(((7.5*8*1024*1024/duration)-(128*1024))/1024), 100);
+  const inName = 'in' + file.name.substring(file.name.lastIndexOf('.'));
+  ffmpeg.FS('writeFile', inName, await fetchFile(file));
+  await ffmpeg.run('-i',inName,'-c:v','libx264','-b:v',`${videoBitrate}k`,'-preset','medium','-c:a','aac','-b:a','128k','-y','out.mp4');
+  const data = ffmpeg.FS('readFile', 'out.mp4');
+  ffmpeg.FS('unlink', inName);
+  ffmpeg.FS('unlink', 'out.mp4');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([data.buffer], {type:'video/mp4'}));
+  a.download = file.name.replace(/\.[^.]+$/, '') + '_compressed.mp4';
+  a.click();
+  box.value = 'click to upload video';
+}
+</script>

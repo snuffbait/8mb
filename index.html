@@ -1,12 +1,14 @@
-<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>compressor</title><style>*,::after,::before{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0d0d0d;--surface:#141414;--border:#222;--border-active:#3a3a3a;--text:#d4d4d4;--muted:#555;--accent:#e8e8e8;--font:'JetBrains Mono',monospace}body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}.wrap{max-width:780px;width:100%}textarea{background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--font);font-size:12px;padding:12px;width:100%;min-height:260px;outline:0;line-height:1.6;cursor:pointer;resize:none;text-align:center;padding-top:120px}textarea:hover{border-color:var(--border-active)}</style>
+<!doctypehtml><html lang=en><meta charset=UTF-8><meta content="width=device-width,initial-scale=1"name=viewport><title>compressor</title><style>*,::after,::before{box-sizing:border-box;margin:0;padding:0}:root{--bg:#0d0d0d;--surface:#141414;--border:#222;--border-active:#3a3a3a;--text:#d4d4d4;--muted:#555;--accent:#e8e8e8;--font:'JetBrains Mono',monospace}body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:13px;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px}.wrap{max-width:780px;width:100%}textarea{background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--font);font-size:12px;padding:12px;width:100%;min-height:260px;outline:0;line-height:1.6;cursor:pointer;resize:none;text-align:center;padding-top:120px}textarea:hover{border-color:var(--border-active)}#progress{margin-top:10px;font-size:11px;color:var(--muted);display:none}</style>
 <div class=wrap>
   <input type=file id=fileInput accept="video/*" style=display:none>
   <textarea id=box readonly onclick="document.getElementById('fileInput').click()">click to upload video</textarea>
+  <div id=progress></div>
 </div>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script>
 <script>
 const box = document.getElementById('box');
 const fileInput = document.getElementById('fileInput');
+const progress = document.getElementById('progress');
 let ffmpeg = null;
 
 if ('serviceWorker' in navigator) {
@@ -17,14 +19,26 @@ if ('serviceWorker' in navigator) {
 
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) run(fileInput.files[0]); });
 
+function bar(pct) {
+  const filled = Math.round(pct / 5);
+  return '[' + '█'.repeat(filled) + '░'.repeat(20 - filled) + '] ' + pct + '%';
+}
+
 async function run(file) {
-  box.value = 'loading ffmpeg...';
+  box.value = 'compressing...';
+  progress.style.display = 'block';
+  progress.textContent = bar(0);
   const { createFFmpeg, fetchFile } = FFmpeg;
   if (!ffmpeg) {
-    ffmpeg = createFFmpeg({ log: false });
+    ffmpeg = createFFmpeg({
+      log: false,
+      progress: ({ ratio }) => {
+        const pct = Math.min(Math.round(ratio * 100), 100);
+        progress.textContent = bar(pct);
+      }
+    });
     await ffmpeg.load();
   }
-  box.value = 'compressing...';
   const duration = await new Promise(res => {
     const v = document.createElement('video');
     v.preload = 'metadata';
@@ -43,5 +57,6 @@ async function run(file) {
   a.download = file.name.replace(/\.[^.]+$/, '') + '_compressed.mp4';
   a.click();
   box.value = 'click to upload video';
+  progress.style.display = 'none';
 }
 </script>

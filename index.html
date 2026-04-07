@@ -9,7 +9,11 @@ const box = document.getElementById('box');
 const fileInput = document.getElementById('fileInput');
 let ffmpeg = null;
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').then(() => { if (!navigator.serviceWorker.controller) location.reload(); });
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/8mb/sw.js', { scope: '/8mb/' }).then(() => {
+    if (!navigator.serviceWorker.controller) location.reload();
+  });
+}
 
 fileInput.addEventListener('change', () => { if (fileInput.files[0]) run(fileInput.files[0]); });
 
